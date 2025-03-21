@@ -22,9 +22,9 @@
  *	     .. this parameter is MANDATORY
  *
  *	-h show help
- *	-d print debug information and all stats = YES default NO
- *	-i enable otput info print informations default DISABLE
- *	-w disable write  data to output file - default ENABLE
+ *	-d PRINT debug information and all stats = YES default NO
+ *	-i ENABLE otput info print informations default DISABLE
+ *	-w DISABLE write  data to output file plus enable debug info - default ENABLE
  *	-o=outfilename output file name to write binary data
  *	     .. default: "out.bin"
  *	     .. example: iHex2bin.exe -o=output.bin
@@ -39,7 +39,7 @@
  *	     .. example "-e=0xFFFFFFFF" or decimal "-e=4294967295"
  *
  *	     .. tip: use 
- *	      iHex2bin.exe inputfilename.hex -w -d 
+ *	      iHex2bin.exe inputfilename.hex -w 
  *	      Above option is only scanning mode of iHex file
  *
  ********************************************************************************/
@@ -71,7 +71,7 @@
 //==================================
 
 //======================================
-//= Many thanks to Proteus fo this
+//= Many thanks to Proteus for this
 //= console regarding procedure
 //======================================
 #ifdef _WIN32 // WIN compiler or other?
@@ -198,10 +198,10 @@ int read_record(void);
 int scan_file(void);
 int take_one_byte(void);
 int unexp_EOF(void);
-int file_format_error(void);
+int file_format_error(uint8_t data);
 int ASCII_to_byte(uint32_t my_offset);
 uint8_t nybble_check(uint8_t data);
-int  error12_print(void);
+int  error12_print(int data, uint8_t data2);
 int  error14_print(void);
 void close_input(void);
 void close_output(void);
@@ -216,10 +216,9 @@ int copy_to_outbuff(void);
 int fill_out_buffer(uint32_t how_many);
 char* decimal_convert(uint32_t data);
 int flush_buffer(void);
-char* test_params(const char* Filename);
 const char* test_prgname(const char* Filename);
 int check_params(void);
-void compare_names(const char* param);
+int compare_names(const char* param);
 void get_value(const char* param);
 uint32_t get_any_value(const char* param);
 void get_decimal_value(const char* param);
@@ -248,6 +247,7 @@ FILE* outfile;          // output write iHEX converted data
 // 6  = open output file failed 
 // 7  = READ  binary  input file ERROR
 // 8  = WRITE binary output file ERROR
+// 9  = Wrong placed INPUT filename parameter...
 // 10 = unexpected EOF input binary ascii file
 // 11 = input ASCII text file format error
 // 12 = nybble conversion ERROR - data corrupted
@@ -261,6 +261,8 @@ FILE* outfile;          // output write iHEX converted data
 // 20 = wrong segment (#02) address
 // 21 = wrong address in segment (#00)
 // 22 = unrecognized parameter from command line
+// 23 = not typed input filename
+// 24 = in first parameter a first char is wrong "-"
 //========================================================================
 int main(int argc, char* argv[]) {
 	argptr = argv;    // pointer to argv - make copy
@@ -271,14 +273,19 @@ int main(int argc, char* argv[]) {
 	check_prgname();  // set the own exe program name in parameter[0] string (argv[0])
 	
 	result = check_params(); // test sended parameters
-	if (result != 0) {
-		return (show_help(result));
+	if(result == 50) {
+		return (show_help(0)); // dont sign exit error code for this help invoke
 	}
+	
+	if (result != 0) { return (show_help(result)); }
+
+	result = compare_names(pFilename); // check for "out.bin" input file name are this same as output filename
+	if (result != 0) {	return show_help(result); }
 
 	if (input_ihex == NULL) { // input file name was sended?
-		printf("\nInput file name doesn't exists!!!\n");
-		show_help(1);
-		return 1;
+		fprintf(stderr, BrightYellow "\nInput file wasn't typed in a first parameter !!! ERROR #23\n");
+		show_help(23);
+		return 23;
 	}
 
 	result = open_input_file(input_ihex); // open input file
@@ -297,7 +304,7 @@ int main(int argc, char* argv[]) {
 	if (dbg_prt != 0) { debug_print(); } // print debug informations
 
 	if (not_write != 0) {  // if file wasn't write then tell about "-w" parameter
-		printf(BrightRed"\n%s: Scanning file only \"%s\" because \"-w\" parameter was activated\n" BrightGreen, progname, input_ihex);
+		printf(mycolor"\n%s: Scanning file only \"%s\" because \"-w\" parameter used\n" BrightGreen, progname, input_ihex);
 	}
 
 	// all OK, print the last information about conversion
@@ -349,8 +356,8 @@ int read_record(void) {
 	tmpr = input_buffer[inbuf_count];      // HERE IS TAKE A DATA FROM INPUT BUFFER
 
 	if (tmpr != 0x3A) {
-		printf("tmpr = %d ", tmpr);        // if data != ":"
-		return file_format_error();
+		
+		return file_format_error(tmpr);
 	}                                      // then exit with fileformatERROR code (#11)
 
 	for (i = 0; i < 9; i++) {
@@ -386,7 +393,7 @@ int read_record(void) {
 	}                 
 
 	if (record_type > 5) {
-		fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \ndata corruption in type of record in line %d !!!\n\n", progname, argptr[1], actual_line);
+		fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \ndata corruption in type of record (>5) at line %d !!!\n\n", progname, argptr[1], actual_line);
 		close_files();
 		return 15;
 	}
@@ -422,7 +429,7 @@ int read_record(void) {
 	tmpr++;                              // checksum = NEG checksum
 	//========================
 	if (tmpr != checksum) {
-		fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \n ASCII checksum ERROR in line %d !!!\n\n", progname, argptr[1], actual_line);
+		fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \n ASCII checksum ERROR at line %d ERROR #13 !!!\n\n", progname, argptr[1], actual_line);
 		close_files();
 		return 13;
 	}
@@ -455,7 +462,7 @@ int read_record(void) {
 // new line marker error
 //===================================================
 int error14_print(void) {
-	fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \ndata corruption in newline marker in line %d !!!\n\n", progname, argptr[1], actual_line);
+	fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \ndata corruption in newline marker at line %d !!! ERROR #14\n\n", progname, argptr[1], actual_line);
 	close_files();
 	return 14;
 }
@@ -465,8 +472,8 @@ int error14_print(void) {
 // print error data corrupted and 
 // and return ERROR CODE (#12)
 //===================================================
-int error12_print(void) {
-	fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \ndata corruption in nybble conversion in line %d !!!\n\n", progname, argptr[1], actual_line);
+int error12_print(int data, uint8_t data2) {
+	fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \nData corruption in nybble conversion at line %d at possition %d !!!\nERROR #12 expected data from range [0..9] = [0x30..0x39]\n or [A..F] = [0x41..0x46], arrived data 0x%02X \n\n", progname, argptr[1], actual_line, data, data2);
 	close_files();
 	return 12;
 }
@@ -503,18 +510,23 @@ uint8_t nybble_check(uint8_t data) {
 // return value = 0 -> ALL OK
 //====================================================
 int ASCII_to_byte(uint32_t my_offset) {
-	uint8_t nybble;
-	uint32_t i;
+	int32_t x;
+	uint8_t nybble , y;
+	uint32_t i ;
 
-	i = my_offset;                                 // pointer to ASCII high 4 bytes data
-	nybble = nybble_check(input_line[i]);          // test hi nybble ASCII are data corrected?
-	if (nybble > 0x0F) { return error12_print(); } // data corruption error
-	converted_byte[0] = nybble << 4;               // store first nybble binary value
-	i++;                                           // pointer to next ASCII data of half byte
-	nybble = nybble_check(input_line[i]);          // test hi nybble ASCII are data corrected?
-	if (nybble > 0x0F) { return error12_print(); } // data corruption error
-	converted_byte[1] = nybble;                    // store first nybble binary value
-	byte_from_ASCII = converted_byte[0] + nybble;  // store final binary value converted from ASCII
+	i = my_offset;                                   // pointer to ASCII high 4 bytes data
+	x = (int32_t) i+1;                               // if error will occurre this value will be transfered
+    y = input_line[i];                               // when error occurred take value to pass
+	nybble = nybble_check(input_line[i]);            // test hi nybble ASCII are data corrected?
+	if (nybble > 0x0F) { return error12_print(x,y);} // data corruption error
+	converted_byte[0] = nybble << 4;                 // store first nybble binary value
+	i++;                                             // pointer to next ASCII data of half byte
+	y = input_line[i];
+	x++;
+	nybble = nybble_check(input_line[i]);            // test hi nybble ASCII are data corrected?
+	if (nybble > 0x0F) { return error12_print(x,y);} // data corruption error
+	converted_byte[1] = nybble;                      // store first nybble binary value
+	byte_from_ASCII = converted_byte[0] + nybble;    // store final binary value converted from ASCII
 	return 0;
 }
 //===
@@ -524,8 +536,8 @@ int ASCII_to_byte(uint32_t my_offset) {
 // print message and
 // exit errorcode 11
 //================================
-int file_format_error(void) {
-	fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \n format ERROR in line %d !!!\n\n", progname, argptr[1], actual_line);
+int file_format_error(uint8_t data) {
+	fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" format ERROR in line %d !!!\nERROR #11 - expected 0x3A = \":\" arrived 0x%02X \n\n", progname, argptr[1], actual_line, data);
 	close_files();
 	return 11;
 }
@@ -536,7 +548,7 @@ int file_format_error(void) {
 // error code 10
 //================================
 int unexp_EOF(void) {
-	fprintf(stderr, BrightYellow"\n\n%s: Unexpected EOF input file \"%s\" in line %d\n\n", progname, argptr[1], actual_line);
+	fprintf(stderr, BrightYellow"\n\n%s: ERROR #10 Unexpected EOF input file \"%s\" in line %d\n\n", progname, argptr[1], actual_line);
 	close_files();
 	return 10;
 }
@@ -590,7 +602,7 @@ int read_data(void) {
 	elements_read = fread(&input_buffer, length_data_bytes, 1, infile); // read data into a buffer
 
 	if (elements_read == 0) {             // read ERROR occurred?
-		fprintf(stderr, BrightYellow"\n\n%s: READ binary input iHex file \"%s\" ERROR !!!\n\n", progname, argptr[1]);
+		fprintf(stderr, BrightYellow"\n\n%s: READ binary INPUT iHex file \"%s\" ERROR #7 !!!\n\n", progname, argptr[1]);
 		close_files();
 		return 7;
 	}
@@ -617,18 +629,18 @@ int open_input_file(const char* Filename) {
 	if (stat(Filename, &filestatus) < 0) // check file exists and file size
 	{
 		if (filestatus.st_nlink == 0) {       // is file exists??
-			fprintf(stderr, BrightYellow"\n\nFile: \"%s\" doesn't exists !!!\n\n", Filename);
+			fprintf(stderr, BrightYellow"\n\nINPUT File: \"%s\" doesn't exists !!! ERROR #2\n\n", Filename);
 			return 2;
 		}
 		else { // any other IO read ERROR
-			fprintf(stderr, BrightYellow"\nError of checking info file: %s !!!\n", Filename);
+			fprintf(stderr, BrightYellow"\nAny I/O error ... of checking INPUT info file: %s !!! ERROR #3\n", Filename);
 			return 3;
 		}
 	}
 	//fopen_s(&infile, Filename, "rb");   // open input binary file to read
 	infile = fopen(Filename, "rb");       // open input binary file to read
 	if (infile == NULL) {                 // occurred error in open file?
-		fprintf(stderr, BrightYellow"\n%s: open input file \"%s\" failed !!!\n\n", progname, argptr[1]);
+		fprintf(stderr, BrightYellow"\n%s: open INPUT file \"%s\" failed !!! ERROR #5\n\n", progname, argptr[1]);
 		return 5;
 	}
 
@@ -873,7 +885,7 @@ int flush_buffer(void) {
 	if (save_data == 0) { // if need doing write do it
 		size_t elements_written = fwrite(&output_buffer[start_buf], bytes_to_write, 1, outfile); // write data
 		if (elements_written == 0) {      // exists WRITE ERROR?
-			fprintf(stderr, BrightYellow"\n\n%s: WRITE binary output file \"%s\" ERROR !!!\n\n", progname, pFilename);
+			fprintf(stderr, BrightYellow"\n\n%s: WRITE binary OUTPUT file \"%s\" ERROR #8 !!!\n\n", progname, pFilename);
 			close_files();                // close opened files
 			return 8;                     // ERRROR
 		}
@@ -942,7 +954,7 @@ int regard0204(void) {
 		tmpr4 = tmpr4 + output_line[1];
 
 		if (tmpr4 < tmpr2) {  // wrong continue segment address
-			fprintf(stderr, BrightYellow"\n\nSegment (#04) wrong hi address at line %d \n\n", actual_line);
+			fprintf(stderr, BrightYellow"\n\nERROR #18 - Segment (#04) wrong hi address at line %d \n\n", actual_line);
 			close_files();
 			return 18;
 		}
@@ -971,7 +983,7 @@ int regard0204(void) {
 		if (dbg_prt != 0) { printf(debugcolor"Record 02 type at address: 0x%08X at line: %d\n", address, actual_line); }
 
 		if (tmpr4 < tmpr2) {  // wrong continue segment address
-			fprintf(stderr, BrightYellow"\n\nSegment (#02) wrong hi address at line %d \n\n", actual_line);
+			fprintf(stderr, BrightYellow"\n\nERROR #20 Segment (#02) wrong hi address at line %d \n\n", actual_line);
 			close_files();
 			return 20;
 		}
@@ -1086,7 +1098,7 @@ int open_for_write(const char* Filename) {
 
 	outfile = fopen(Filename, "wb");      // open input binary file to read
 	if (outfile == NULL) {                // I/O ERROR occurred?
-		fprintf(stderr, BrightYellow"\n%s: open output file \"%s\" failed !!!\n\n", progname, argptr[2]);
+		fprintf(stderr, BrightYellow"\n%s: open output file \"%s\" failed !!! ERROR #6\n\n", progname, argptr[2]);
 		close_files();
 		return 6;
 	}
@@ -1110,9 +1122,9 @@ int show_help(int data)
 		"     .. this parameter is MANDATORY\n\n"
 
 		"-h for show this help\n"
-		"-d print debug information and all stats = YES default NO\n"
-		"-i enable otput info print informations default DISABLE\n"
-		"-w disable write  data to output file - default ENABLE\n\n"
+		"-d PRINT debug information and all stats = YES default NO\n"
+		"-i ENABLE otput info print informations default DISABLE\n"
+		"-w DISABLE write  data to output file plus enable debug info - default ENABLE\n\n"
 		"-o=outfilename output file name to write binary data\n"
 		"     .. default: \"out.bin\"\n"
 		"     .. example: %s -o=output.bin\n"
@@ -1127,7 +1139,7 @@ int show_help(int data)
 		"     .. example \"-e=0xFFFFFFFF\" or decimal \"-e=4294967295\"\n\n"BrightCyan
 
 		"     .. tip: use \n"BrightGreen
-		"      %s inputfilename.hex -w -d \n"White
+		"      %s inputfilename.hex -w \n"White
 		"      Above option is only scanning mode of iHex file\n"consolecolor
 		"\n",
 		progname, progname, progname
@@ -1194,7 +1206,7 @@ int scan_file(void) {
 	}
 
 	if (record_type != 0) {
-		fprintf(stderr, BrightYellow"\n\nRecord (#00) expected, but it doesn't at line %d \n", actual_line);
+		fprintf(stderr, BrightYellow"\n\nERROR #16 - Record (#00) expected, but it doesn't at line %d \n", actual_line);
 		return 16; // mess record order
 	}
 	else {  // record type = (#00)
@@ -1257,7 +1269,7 @@ int scan_file(void) {
 		//****************************** */ */
 		if (tmpr1 > 0xFFFF) {         // now we waitting for link data
 			if (tmpr1 != 0x10000) {   // or EOF, or checing structure overflow error
-				fprintf(stderr, BrightYellow"\n\nRecord (#0) wrong overflow data length %d \n\n", actual_line);
+				fprintf(stderr, BrightYellow"\n\nERROR #17 - Record (#00) wrong overflow data length %d \n\n", actual_line);
 				close_files();
 				return 17;
 			}
@@ -1273,7 +1285,7 @@ int scan_file(void) {
 			tmpr3 = tmpr2 >> 12;     // prepare speculative new record (#02) address field
 			if (record_type == 1) { return 0; } // end of file (EOF)
 			if (record_type == 0) {
-				fprintf(stderr, BrightYellow"\n\nSegment (#00) wrong order arriving at line %d \n\n", actual_line);
+				fprintf(stderr, BrightYellow"\n\nERROR #19 - Segment (#00) wrong order arriving at line %d \n\n", actual_line);
 				return 19;
 			}
 
@@ -1314,7 +1326,7 @@ int scan_file(void) {
 			else {
 				if (record_addr < tmpr2) {
 					printf("tmpr2 = 0x%08X ; record_addr = 0x%08X", tmpr2, record_addr);
-					fprintf(stderr, BrightYellow"\n\nRecord (#00) wrong address at line %d \n\n", actual_line);
+					fprintf(stderr, BrightYellow"\n\nERROR #21 - Record (#00) wrong address at line %d \n\n", actual_line);
 					close_files();
 					return 21;
 				}
@@ -1352,7 +1364,7 @@ int scan_file(void) {
 // and if are thes same output filename is
 // setting to default value "out.bin"
 //===============================================
-void compare_names(const char* param) {
+int compare_names(const char* param) {
 	int len1;      // length input filename
 	int len2;      // length output filename
 	int i;         // iterator
@@ -1376,7 +1388,7 @@ void compare_names(const char* param) {
 
 	if (len1 != len2) {
 		pFilename = pTest; // filenames are not this same
-		return;            // exit from procedure
+		return 0;            // exit from procedure
 	}
 
 	if (len1 == len2) {
@@ -1386,11 +1398,12 @@ void compare_names(const char* param) {
 
 			if (data1 != data2) {
 				pFilename = pTest;// filenames are not this same
-				return;           // exit from procedure
+				return 0;           // exit from procedure
 			}
 		}
 	}
-	fprintf(stderr, BrightYellow"\nInput and output filenames are this same !!!\nOutput filename is STILL as default value: \"%s\"\n", pFilename);
+	fprintf(stderr, BrightYellow"\nERROR #4 Input iHex filename " BrightRed "%s" BrightYellow " and output " BrightRed "%s " BrightYellow"are this same !!!\n" , pIhex , pTest);
+	return 4;
 }
 //===
 //==========================================
@@ -1422,12 +1435,11 @@ uint32_t get_any_value(const char* param) {
 //=====================================================
 int check_params(void) {
 
-	int i;
+	int i, result;
 
 	if (arg_count < 2) { // to less parameters !!!
-		fprintf(stderr, BrightYellow"\n\n To less parameters ! \n\n");
+		fprintf(stderr, BrightYellow"\n\n To less parameters ! ERROR #1\n\n");
 		return 1;
-		return 0;
 	}
 
 	for (i = 1; i < arg_count; i++) {
@@ -1438,14 +1450,12 @@ int check_params(void) {
 			}
 			else {
 				if (i == 1) {
-					fprintf(stderr, BrightYellow"\nThe first MANDATORY parameter as input iHex filename wasn't typed !!!\nWrong first parameter char \"-\"\n");
-
-					return 2;
+					fprintf(stderr, BrightYellow"\nThe first MANDATORY parameter as input iHex filename wasn't typed !!! ERROR #24\nWrong first parameter char \"-\"\n");
+					return 24;
 				}
 				if (argptr[i][1] == 'd') {
 					if(argptr[i][2] != 0) { return param_print_error(argptr[i]); }
 					dbg_prt = 1; // enable debug info
-					verbose = 1;
 				}
 				if (argptr[i][1] == 'i') {
 					if (argptr[i][2] != 0) { return param_print_error(argptr[i]); }
@@ -1454,11 +1464,14 @@ int check_params(void) {
 				if (argptr[i][1] == 'w') {
 					if (argptr[i][2] != 0) { return param_print_error(argptr[i]); }
 					not_write = 1;
+					verbose = 1;
+					dbg_prt = 1;
 				}
 				if (argptr[i][1] == 'o') {
 					if (argptr[i][2] == '=') {
 						if ((uint8_t)argptr[i][3] != 0) {
-							compare_names(&argptr[i][3]); // test for change output filename
+							result  = compare_names(&argptr[i][3]); // test for change output filename
+							if(result != 0) { return result; }
 						}
 					}
 				} // end of outputfilename check
@@ -1490,8 +1503,8 @@ int check_params(void) {
 			}
 			else {
 				if (i == 1) {
-					fprintf(stderr, BrightYellow"\nThe first MANDATORY parameter as input iHex filename wasn't typed !!!\n");
-					return 2;
+					fprintf(stderr, BrightYellow"\nThe first MANDATORY parameter as input iHex filename wasn't typed !!! ERROR #9\nWrong placed INPUT filename parameter...\n");
+					return 9;
 				}
 				else {
 					return param_print_error(argptr[i]);
@@ -1548,7 +1561,7 @@ void debug_print(void) {
 // unrecognized parameter
 //=========================
 int param_print_error(const char* param) {
-	fprintf(stderr, BrightYellow"\n\nWrong parameter string - no match: " BrightRed "\"%s\"\n\n"BrightWhite"PLEASSE WAIT 3s ...\n", param);
+	fprintf(stderr, BrightYellow"\n\nERROR #22 Wrong parameter string - no match: " BrightRed "\"%s\"\n\n"BrightWhite"PLEASSE WAIT 3s ...\n", param);
 #ifdef _WIN32
 	Sleep(3000);  // for Windows
 #else

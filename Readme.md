@@ -15,9 +15,9 @@
  *	     .. this parameter is MANDATORY
  *
  *	-h show help
- *	-d print debug information and all stats = YES default NO
- *	-i enable otput info print informations default DISABLE
- *	-w disable write  data to output file - default ENABLE
+ *	-d PRINT debug information and all stats = YES default NO
+ *	-i ENABLE otput info print informations default DISABLE
+ *	-w DISABLE write  data to output file plus enable debug info - default ENABLE
  *	-o=outfilename output file name to write binary data
  *	     .. default: "out.bin"
  *	     .. example: iHex2bin.exe -o=output.bin
@@ -32,7 +32,7 @@
  *	     .. example "-e=0xFFFFFFFF" or decimal "-e=4294967295"
  *
  *	     .. tip: use 
- *	      iHex2bin.exe inputfilename.hex -w -d 
+ *	      iHex2bin.exe inputfilename.hex -w  
  *	      Above option is only scanning mode of iHex file
  *
  ********************************************************************************/
