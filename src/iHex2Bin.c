@@ -10,11 +10,11 @@
 
  /***************************************************************************
  * iHex2bin program to convert iHex ASCII file to binary.
- * 
- * parameters:
- * 
  *
- * 
+ * parameters:
+ *
+ *
+ *
  *	Usage: iHex2bin.exe {inputfilename} [parameters]
  *	parameters are:
  *
@@ -30,7 +30,7 @@
  *	     .. example: iHex2bin.exe -o=output.bin
  *	-p=8bit_value padding 8bit value for GAP FILLING
  *	     .. default = 0xFF - hex or decimal input value are accepted
- *	     .. example: "-p=0x00" or decimal "-p=255" 
+ *	     .. example: "-p=0x00" or decimal "-p=255"
  *	-s=32bit_value start addres for write iHex to binary data
  *	     .. default 0x00000000 - hex or decimal input value are accepted
  *	     .. example "-s=0x00000000" or decimal "-s=0"
@@ -38,8 +38,8 @@
  *	     .. default 0xFFFFFFFF - hex or decimal input value are accepted
  *	     .. example "-e=0xFFFFFFFF" or decimal "-e=4294967295"
  *
- *	     .. tip: use 
- *	      iHex2bin.exe inputfilename.hex -w 
+ *	     .. tip: use
+ *	      iHex2bin.exe inputfilename.hex -w
  *	      Above option is only scanning mode of iHex file
  *
  ********************************************************************************/
@@ -60,7 +60,7 @@
  //  along with this program. If not, see <http://www.gnu.org/licenses/>.
  //
  ///////////////////////////////////////////////////////////////////////////////
- 
+
 
 //==================================
 #define _CRT_SECURE_NO_WARNINGS
@@ -271,16 +271,16 @@ int main(int argc, char* argv[]) {
 
 	initConsole();
 	check_prgname();  // set the own exe program name in parameter[0] string (argv[0])
-	
+
 	result = check_params(); // test sended parameters
-	if(result == 50) {
+	if (result == 50) {
 		return (show_help(0)); // dont sign exit error code for this help invoke
 	}
-	
+
 	if (result != 0) { return (show_help(result)); }
 
 	result = compare_names(pFilename); // check for "out.bin" input file name are this same as output filename
-	if (result != 0) {	return show_help(result); }
+	if (result != 0) { return show_help(result); }
 
 	if (input_ihex == NULL) { // input file name was sended?
 		fprintf(stderr, BrightYellow "\nInput file wasn't typed in a first parameter !!! ERROR #23\n");
@@ -356,7 +356,7 @@ int read_record(void) {
 	tmpr = input_buffer[inbuf_count];      // HERE IS TAKE A DATA FROM INPUT BUFFER
 
 	if (tmpr != 0x3A) {
-		
+
 		return file_format_error(tmpr);
 	}                                      // then exit with fileformatERROR code (#11)
 
@@ -390,7 +390,7 @@ int read_record(void) {
 	if (record_type == 0) {
 		record00_bytes = record00_bytes + many_bt; // calc RAW data bytes in records (#00)
 		seg0_count++;                   // count seg (#00) for statistics
-	}                 
+	}
 
 	if (record_type > 5) {
 		fprintf(stderr, BrightYellow"\n\n%s: Input ASCII text file \"%s\" \ndata corruption in type of record (>5) at line %d !!!\n\n", progname, argptr[1], actual_line);
@@ -511,20 +511,20 @@ uint8_t nybble_check(uint8_t data) {
 //====================================================
 int ASCII_to_byte(uint32_t my_offset) {
 	int32_t x;
-	uint8_t nybble , y;
-	uint32_t i ;
+	uint8_t nybble, y;
+	uint32_t i;
 
 	i = my_offset;                                   // pointer to ASCII high 4 bytes data
-	x = (int32_t) i+1;                               // if error will occurre this value will be transfered
-    y = input_line[i];                               // when error occurred take value to pass
+	x = (int32_t)i + 1;                               // if error will occurre this value will be transfered
+	y = input_line[i];                               // when error occurred take value to pass
 	nybble = nybble_check(input_line[i]);            // test hi nybble ASCII are data corrected?
-	if (nybble > 0x0F) { return error12_print(x,y);} // data corruption error
+	if (nybble > 0x0F) { return error12_print(x, y); } // data corruption error
 	converted_byte[0] = nybble << 4;                 // store first nybble binary value
 	i++;                                             // pointer to next ASCII data of half byte
 	y = input_line[i];
 	x++;
 	nybble = nybble_check(input_line[i]);            // test hi nybble ASCII are data corrected?
-	if (nybble > 0x0F) { return error12_print(x,y);} // data corruption error
+	if (nybble > 0x0F) { return error12_print(x, y); } // data corruption error
 	converted_byte[1] = nybble;                      // store first nybble binary value
 	byte_from_ASCII = converted_byte[0] + nybble;    // store final binary value converted from ASCII
 	return 0;
@@ -942,6 +942,7 @@ void show_info05(void) {
 int regard0204(void) {
 	int result;
 	uint32_t tmpr2, tmpr4;
+	if (record_type == 1) { return 0; }
 	tmpr2 = address >> 16;
 	//******************************************** */
 	// check new data output addres fro record (#04)
@@ -1402,7 +1403,7 @@ int compare_names(const char* param) {
 			}
 		}
 	}
-	fprintf(stderr, BrightYellow"\nERROR #4 Input iHex filename " BrightRed "%s" BrightYellow " and output " BrightRed "%s " BrightYellow"are this same !!!\n" , pIhex , pTest);
+	fprintf(stderr, BrightYellow"\nERROR #4 Input iHex filename " BrightRed "%s" BrightYellow " and output " BrightRed "%s " BrightYellow"are this same !!!\n", pIhex, pTest);
 	return 4;
 }
 //===
@@ -1454,7 +1455,7 @@ int check_params(void) {
 					return 24;
 				}
 				if (argptr[i][1] == 'd') {
-					if(argptr[i][2] != 0) { return param_print_error(argptr[i]); }
+					if (argptr[i][2] != 0) { return param_print_error(argptr[i]); }
 					dbg_prt = 1; // enable debug info
 				}
 				if (argptr[i][1] == 'i') {
@@ -1470,8 +1471,8 @@ int check_params(void) {
 				if (argptr[i][1] == 'o') {
 					if (argptr[i][2] == '=') {
 						if ((uint8_t)argptr[i][3] != 0) {
-							result  = compare_names(&argptr[i][3]); // test for change output filename
-							if(result != 0) { return result; }
+							result = compare_names(&argptr[i][3]); // test for change output filename
+							if (result != 0) { return result; }
 						}
 					}
 				} // end of outputfilename check
